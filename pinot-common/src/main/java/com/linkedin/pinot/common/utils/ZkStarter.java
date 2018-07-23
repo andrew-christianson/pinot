@@ -158,12 +158,10 @@ public class ZkStarter {
             }
             System.out.println("Total run time for zookeeper is: " + (zookeeperEndTime - zookeeperStartTime) + "ms. dataDirPath: " + dataDirPath);
           } catch (QuorumPeerConfig.ConfigException e) {
-            System.out.println("Caught exception while starting ZK" + e.getMessage());
-            e.printStackTrace();
+            System.out.println("Caught ConfigException while starting ZK " + e.toString());
             LOGGER.warn("Caught exception while starting ZK", e);
           } catch (IOException e) {
-            System.out.println("Caught exception while starting ZK" + e.getMessage());
-            e.printStackTrace();
+            System.out.println("Caught IOException while starting ZK " + e.toString());
             LOGGER.warn("Caught exception while starting ZK", e);
           }
         }
@@ -178,9 +176,8 @@ public class ZkStarter {
 
       return new ZookeeperInstance(zookeeperServerMain, dataDirPath);
     } catch (Exception e) {
-      System.out.println("Caught exception while starting ZK" + e.getMessage());
-      e.printStackTrace();
-      LOGGER.warn("Caught exception while starting ZK", e);
+      System.out.println("Caught exception while starting ZK " + e.toString());
+      LOGGER.warn("Caught exception while starting ZK ", e);
       throw new RuntimeException(e);
     }
   }
