@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.minion;
 
+import com.linkedin.pinot.common.config.RollupConfig;
+import com.linkedin.pinot.common.config.SegmentMergeConfig;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -31,7 +33,9 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
@@ -65,7 +69,7 @@ public class SegmentConverterTest {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec(D1, FieldSpec.DataType.INT, true));
     schema.addField(new DimensionFieldSpec(D2, FieldSpec.DataType.STRING, true));
-    schema.addField(new MetricFieldSpec(M1, FieldSpec.DataType.INT));
+    schema.addField(new MetricFieldSpec(M1, FieldSpec.DataType.LONG));
     schema.addField(new TimeFieldSpec(T, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
@@ -94,6 +98,49 @@ public class SegmentConverterTest {
 
       _segmentIndexDirList.add(new File(ORIGINAL_SEGMENT_DIR, segmentName));
     }
+  }
+
+  @Test
+  public void testRollupSegmentConverter() throws Exception {
+
+    Map<String, String> preAggregateType = new HashMap<>();
+    preAggregateType.put(M1, "SUM");
+
+    SegmentMergeConfig segmentMergeConfig = new SegmentMergeConfig();
+
+    RollupConfig rollupConfig = new RollupConfig();
+    rollupConfig.setPreAggregateType(preAggregateType);
+
+    segmentMergeConfig.setRollupConfig(rollupConfig);
+
+    RollupSegmentConverter rollupSegmentConverter = new RollupSegmentConverter(_segmentIndexDirList, WORKING_DIR, segmentMergeConfig ,null);
+    List<File> result = rollupSegmentConverter.convert();
+    Assert.assertEquals(result.size(), 1);
+    List<GenericRow> outputRows = new ArrayList<>();
+    try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(result.get(0))) {
+      while (pinotSegmentRecordReader.hasNext()) {
+        outputRows.add(pinotSegmentRecordReader.next());
+      }
+    }
+
+    for (GenericRow row : outputRows) {
+      System.out.println(row);
+    }
+    // Check that the segment is correctly rolled up on the time column
+    Assert.assertEquals(outputRows.size(), NUM_ROWS / REPEAT_ROWS,
+        "Number of rows returned by segment converter is incorrect");
+
+    // Check the value
+    int expectedValue = 0;
+    for (GenericRow row: outputRows) {
+      Assert.assertEquals(row.getValue(D1), expectedValue);
+      Assert.assertEquals(row.getValue(D2), Long.toString(expectedValue));
+      Assert.assertEquals(row.getValue(M1), (long) expectedValue * NUM_SEGMENTS * REPEAT_ROWS);
+      expectedValue++;
+    }
+
+
+
   }
 
   @Test
